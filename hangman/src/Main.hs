@@ -7,6 +7,8 @@ import Data.List (intersperse)
 import System.Exit (exitSuccess)
 import System.Random (randomRIO)
 
+import Test.Hspec
+
 newtype WordList =
   WordList [String]
   deriving (Eq, Show)
@@ -40,6 +42,7 @@ randomWord' :: IO String
 randomWord' = gameWords >>= randomWord
 
 data Puzzle = Puzzle String [Maybe Char] [Char]
+  deriving Eq
 
 instance Show Puzzle where
   show (Puzzle _ discovered guessed) =
@@ -68,8 +71,8 @@ fillInCharacter (Puzzle word filledInSoFar s) c =
           then Just wordChar
           else guessChar
         newFilledInSoFar =
-          zipWith (zipper c)
-            word filledInSoFar
+          let zd = (zipper c)
+          in zipWith zd word filledInSoFar
 
 handleGuess :: Puzzle -> Char -> IO Puzzle
 handleGuess puzzle guess = do
@@ -80,7 +83,7 @@ handleGuess puzzle guess = do
       putStrLn "You already guessed that character, pick something else!"
       return puzzle
     (True, _) -> do
-      putStrLn "This character was in the word, fillin the word accordingly"
+      putStrLn "This character was in the word, fill in the word accordingly"
       return (fillInCharacter puzzle guess)
     (False, _) -> do
       putStrLn "This character wasn't in the word, try again."
@@ -111,6 +114,24 @@ runGame puzzle = forever $ do
   case guess of
     [c] -> handleGuess puzzle c >>= runGame
     _ -> putStrLn "Your guess must be a single character"
+
+runHspec :: IO ()
+runHspec = hspec $ do
+  describe "fillInCharacter" $ do
+    it "Adding already guessed character results in same Puzzle" $ do
+      fillInCharacter (Puzzle "cat" [Just 'c', Nothing, Nothing] ['c']) 'c' `shouldBe`
+                      (Puzzle "cat" [Just 'c', Nothing, Nothing] ['c', 'c'])
+    it "Adding new guess character gets filled in Puzzle" $ do
+      fillInCharacter (Puzzle "cat" [Just 'c', Nothing, Nothing] ['c']) 'a' `shouldBe`
+                      (Puzzle "cat" [Just 'c', Just 'a', Nothing] ['a', 'c'])
+
+  describe "handleGuess" $ do
+    it "Adding already guessed character results in same Puzzle" $ do
+      newPuzzle <- handleGuess (Puzzle "cat" [Nothing, Nothing, Nothing] ['k']) 'k'
+      newPuzzle `shouldBe` (Puzzle "cat" [Nothing, Nothing, Nothing] ['k'])
+    it "Adding new guess character gets filled in Puzzle" $ do
+      newPuzzle <- handleGuess (Puzzle "cat" [Nothing, Nothing, Nothing] []) 'c'
+      newPuzzle `shouldBe` (Puzzle "cat" [Just 'c', Nothing, Nothing] ['c'])
 
 main :: IO ()
 main = do
